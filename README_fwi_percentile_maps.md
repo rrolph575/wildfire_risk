@@ -12,7 +12,9 @@ data.
 Two Sup3rCC runs (same grid, 2.3M cells):
 - **Historical** (2000–2014, 15 files) — used for the percentile thresholds:
   `/datasets/sup3rcc/conus_ecearth3veg_historical_r1i1p1f1/v0.2.2/daily/*fwi*.h5`
-- **SSP245** (2015–2059, 45 files, ~151 GB) — used for the year counts:
+- **SSP245** (2015–2059, 45 files, ~151 GB) — used for the year counts. By
+  default only years from `COUNT_YEAR_MIN` (=2025) onward are counted, i.e.
+  2025–2059 (35 years):
   `/datasets/sup3rcc/conus_ecearth3veg_ssp245_r1i1p1f1/v0.2.2/daily/*fwi*.h5`
 
 NREL rex-format H5. Each file has datasets:
@@ -33,7 +35,7 @@ years 2000–2014):
 3. 98th percentile of daily FWI
 
 **Exceedance-frequency maps** (per grid cell, counted over the SSP245 run
-2015–2059, value = number of years, 0–45):
+2025–2059, value = number of years, 0–35):
 4. # years above the p90 historical threshold
 5. # years above the p95 historical threshold
 6. # years above the p98 historical threshold
@@ -44,8 +46,9 @@ percentile (10% of days for p90, 5% for p95, 2% for p98). Because the threshold
 is the historical (2000–2014) climatology, SSP245 years increasingly exceed it
 under warming — so the maps surface WHERE and HOW FAST extreme fire-weather days
 become more frequent, without using the scenario period as its own baseline
-(e.g. a California sample averages ~32/45 years above the p90 threshold, rising
-from mixed in the 2010s to nearly all cells by the 2050s).
+(a California sample shows the p90 exceedance count rising from mixed in the
+2010s to nearly all cells by the 2050s; counting only 2025–2059 drops the early
+low-exceedance years).
 
 ## How it runs efficiently
 The full dataset can't fit in memory, so the script streams over spatial blocks
@@ -73,9 +76,9 @@ Written to:
 ```
 /projects/rev/projects/ntps/fy26/underground_transmission/data/fwi/
 ```
-Filenames are tagged `<TAG>` = `<var>_pcthist<start>_<end>` (e.g.
-`fwi_tc_pcthist2000_2014`), so different variables/baseline periods don't
-overwrite each other.
+Filenames are tagged `<TAG>` = `<var>_pcthist<pstart>_<pend>_cnt<cstart>_<cend>`
+(e.g. `fwi_tc_pcthist2000_2014_cnt2025_2059`), so different
+variables/baseline/count periods don't overwrite each other.
 - `<TAG>_percentile_maps.npz` — the map data: `lat`, `lon`, `percentiles`,
   `pct_maps` (3 × n_cells), `year_count_maps` (3 × n_cells), `n_years`,
   `pct_baseline`.
@@ -87,7 +90,9 @@ overwrite each other.
 - `PCT_FILE_GLOB` — files whose pooled days define the percentile thresholds
   (default: the historical 2000–2014 run).
 - `COUNT_FILE_GLOB` — files whose years are counted for exceedance (default: the
-  ssp245 2015–2059 run).
+  ssp245 run).
+- `COUNT_YEAR_MIN` — only count years at/after this (default `2025`, i.e.
+  2025–2059).
 - `PERCENTILES` — defaults `[90, 95, 98]`; baseline rate is `(100 - p)/100`.
 - `CELLS_PER_BLOCK` — memory/speed tradeoff (keep a multiple of 800).
 - `OUT_DIR` — output directory.

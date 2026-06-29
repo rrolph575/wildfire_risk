@@ -13,7 +13,7 @@ and produces 6 CONUS maps:
     3. 98th percentile of daily FWI
 
   Exceedance-frequency maps (per grid cell, counted over the SSP245 run,
-  2015-2059):
+  COUNT_YEAR_MIN-2059; default 2025-2059):
     4. # years that exceed the 90th-percentile threshold "more than baseline"
     5. # years that exceed the 95th-percentile threshold "more than baseline"
     6. # years that exceed the 98th-percentile threshold "more than baseline"
@@ -69,6 +69,10 @@ PCT_FILE_GLOB = ("/datasets/sup3rcc/conus_ecearth3veg_historical_r1i1p1f1/"
 COUNT_FILE_GLOB = ("/datasets/sup3rcc/conus_ecearth3veg_ssp245_r1i1p1f1/"
                    "v0.2.2/daily/*fwi*.h5")   # years counted for exceedance
 
+# Only count exceedance years from this year onward (inclusive). The ssp245 run
+# spans 2015-2059; set to 2025 to count over 2025-2059.
+COUNT_YEAR_MIN = 2025
+
 # Spatial block size for streaming (multiple of the 800-cell HDF5 chunk width).
 # 800 * 60 = 48,000 cells/block.
 CELLS_PER_BLOCK = 800 * 60
@@ -82,11 +86,13 @@ def _years(glob_pat):
                   for f in glob.glob(glob_pat))
 
 
-# Tag outputs with the variable and the historical baseline span so methodology
-# variants don't overwrite each other.
+# Tag outputs with the variable, the historical baseline span, and the
+# exceedance-count window so methodology variants don't overwrite each other.
 _pyrs = _years(PCT_FILE_GLOB)
+_cyrs = [y for y in _years(COUNT_FILE_GLOB) if y >= COUNT_YEAR_MIN]
 PCT_LABEL = f"hist{_pyrs[0]}_{_pyrs[-1]}" if _pyrs else "histNA"
-TAG = f"{VARIABLE}_pct{PCT_LABEL}"
+CNT_LABEL = f"cnt{_cyrs[0]}_{_cyrs[-1]}" if _cyrs else "cntNA"
+TAG = f"{VARIABLE}_pct{PCT_LABEL}_{CNT_LABEL}"
 NPZ_PATH = os.path.join(OUT_DIR, f"{TAG}_percentile_maps.npz")
 
 
@@ -100,6 +106,14 @@ def compute_maps():
         raise FileNotFoundError(f"No files match {PCT_FILE_GLOB}")
     if not count_files:
         raise FileNotFoundError(f"No files match {COUNT_FILE_GLOB}")
+
+    # Restrict exceedance counting to COUNT_YEAR_MIN onward.
+    def _file_year(f):
+        return int(os.path.basename(f).split("_")[-1].split(".")[0])
+    count_files = [f for f in count_files if _file_year(f) >= COUNT_YEAR_MIN]
+    if not count_files:
+        raise FileNotFoundError(
+            f"No count files at/after {COUNT_YEAR_MIN} in {COUNT_FILE_GLOB}")
 
     pctiles = np.asarray(PERCENTILES, dtype=float)
     baseline_rates = (100.0 - pctiles) / 100.0   # p90->0.10, p95->0.05, p98->0.02
