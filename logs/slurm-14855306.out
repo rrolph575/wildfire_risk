@@ -1,0 +1,49 @@
+WHP raster 52,112 x 33,846 (1,763,782,752 cells), nodata=-2147483647.0
+Pass 1: percentile thresholds from histogram...
+  hist rows 0-2,048
+  hist rows 2,048-4,096
+  hist rows 4,096-6,144
+  hist rows 6,144-8,192
+  hist rows 8,192-10,240
+  hist rows 10,240-12,288
+  hist rows 12,288-14,336
+  hist rows 14,336-16,384
+  hist rows 16,384-18,432
+  hist rows 18,432-20,480
+  hist rows 20,480-22,528
+  hist rows 22,528-24,576
+  hist rows 24,576-26,624
+  hist rows 26,624-28,672
+  hist rows 28,672-30,720
+  hist rows 30,720-32,768
+  hist rows 32,768-33,846
+  p90 = 572.0
+  p95 = 1564.0
+  p98 = 5412.0
+Saved thresholds -> /projects/rev/projects/ntps/fy26/underground_transmission/data/whp/whp_pct_burnable_thresholds.json
+Pass 2: writing exceedance GeoTIFFs...
+  geotiff rows 0-2,048
+  geotiff rows 2,048-4,096
+  geotiff rows 4,096-6,144
+  geotiff rows 6,144-8,192
+  geotiff rows 8,192-10,240
+  geotiff rows 10,240-12,288
+  geotiff rows 12,288-14,336
+  geotiff rows 14,336-16,384
+  geotiff rows 16,384-18,432
+  geotiff rows 18,432-20,480
+  geotiff rows 20,480-22,528
+  geotiff rows 22,528-24,576
+  geotiff rows 24,576-26,624
+  geotiff rows 26,624-28,672
+  geotiff rows 28,672-30,720
+  geotiff rows 30,720-32,768
+  geotiff rows 32,768-33,846
+  -> /projects/rev/projects/ntps/fy26/underground_transmission/data/whp/whp_pct_burnable_p90_exceedance.tif
+  -> /projects/rev/projects/ntps/fy26/underground_transmission/data/whp/whp_pct_burnable_p95_exceedance.tif
+  -> /projects/rev/projects/ntps/fy26/underground_transmission/data/whp/whp_pct_burnable_p98_exceedance.tif
+Rendering decimated maps...
+  decimation factor 22 -> 2368x1538 px
+Saved figure -> /projects/rev/projects/ntps/fy26/underground_transmission/data/whp/whp_pct_burnable_percentile_maps.png
+Saved 3 individual panels in /projects/rev/projects/ntps/fy26/underground_transmission/data/whp
+Done.

@@ -8,6 +8,13 @@ data.
 - `submit_fwi_percentile_maps.sh` — SLURM batch script to run it on an HPC node.
 - `logs/` — SLURM job logs land here (`slurm-<jobid>.out`).
 
+Post-processing helpers (operate on the saved `.npz`; run in the `rev` conda env):
+- `list_npz.py` — print the arrays (name/shape/dtype) stored in an `.npz`.
+- `extract_p98_year_count.py` — pull the 98th-percentile year-count row out of
+  `<TAG>_percentile_maps.npz` into a standalone `<TAG>_p98_year_count_map.npz`.
+- `npz_to_tiff.py` — convert that p98 year-count `.npz` into a GeoTIFF.
+- `plot_region.py` — plot a region of the GeoTIFF + a ~50 km transect to a PNG.
+
 ## Input data
 Two Sup3rCC runs (same grid, 2.3M cells):
 - **Historical** (2000–2014, 15 files) — used for the percentile thresholds:
@@ -100,7 +107,50 @@ variables/baseline/count periods don't overwrite each other.
 Re-running: if the `.npz` already exists, compute is skipped and only the plots
 are regenerated. Delete the `.npz` to force a full recompute.
 
+## Post-processing the p98 year-count map
+Downstream steps that turn the saved `.npz` into a GeoTIFF and a quick-look PNG.
+These run in the `rev` conda env (has numpy, rasterio, matplotlib):
+```bash
+conda activate rev
+cd /home/rrolph/wildfire
+```
+
+1. **Extract** the p98 year-count map into its own `.npz`:
+   ```bash
+   python extract_p98_year_count.py [src_npz] [out_npz]
+   ```
+   Defaults: reads `<TAG>_percentile_maps.npz`, writes
+   `<TAG>_p98_year_count_map.npz` (arrays `lat`, `lon`, `year_count_map`,
+   `percentile`, `n_years`, `variable`, `pct_baseline`). Inspect any `.npz` with
+   `python list_npz.py <path>`.
+
+2. **Convert to GeoTIFF.** The `.npz` stores flattened per-cell `lat`/`lon`/
+   `year_count_map`; the cells form a regular lat/lon grid (1000 × 2300,
+   row-major, latitude outer). The script reshapes to a north-up grid, derives an
+   affine transform from the cell-center coordinates, and writes a single-band
+   GeoTIFF in EPSG:4326 (`nodata = -1`, deflate-compressed):
+   ```bash
+   python npz_to_tiff.py [src_npz] [out_tiff]
+   ```
+   Default output: `<TAG>_p98_year_count_map.tiff`.
+
+3. **Plot a region + transect.** Crops the GeoTIFF to a region and draws a
+   ~50 km transect, producing a two-panel PNG (regional map with the line
+   overlaid + the year-count profile vs. distance along it):
+   ```bash
+   python plot_region.py [out_png] [lat0 lon0 lat1 lon1]
+   ```
+   The default transect runs W→E across California's Central Valley near 38.5 N
+   (lon -122.10 → -121.52), crossing from the low-count valley floor up into the
+   higher-count Sierra foothills. Pass four endpoint coords to pick another
+   region, e.g.:
+   ```bash
+   python plot_region.py cv.png 38.5 -122.10 38.5 -121.52
+   ```
+
 ## Notes
 - Maps use plain matplotlib scatter (no cartopy in the `sup3r` env), so there
   are no coastlines — points are placed by lat/lon. Install cartopy if you want
   basemap features.
+- The percentile-map pipeline runs in the `sup3r` env; the post-processing
+  scripts above run in the `rev` env (which has rasterio).
