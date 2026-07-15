@@ -1,4 +1,0 @@
-# wildfire_risk_changes_capacity: don't track cache blobs or the planning doc
-wildfire_risk_changes_capacity/*.npz
-wildfire_risk_changes_capacity/PROJECT_PLAN*.md
-wildfire_risk_changes_capacity/logs/
