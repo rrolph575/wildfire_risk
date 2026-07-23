@@ -33,14 +33,14 @@ an `.npz`.
 
 ## 3. Undergrounding thresholds — `undergrounding_thresholds.py`
 A line segment (or grid cell) is undergrounded where the **future exceedance
-rate A** (days/yr above the historical p98) meets or exceeds a threshold.
-Undergrounding is costly, so three fixed thresholds underground progressively
-less area:
+rate A** (days/yr above the historical p98) meets or exceeds a threshold. A
+lower threshold catches more area → more undergrounding. A set of fixed
+thresholds is evaluated (no low/medium/high labels):
 
-- **low = 16, medium = 18, high = 20 days/yr**. A lower threshold catches more
-  area → more undergrounding. These land on the tail of the exceedance
-  distribution, so only the most fire-exposed areas trigger undergrounding
-  (~2.5 / 1.4 / 0.8% of CONUS cells for low / medium / high).
+- **8, 10, 15, 16, 18, 20 days/yr** — undergrounding ~51 / 27 / 3.6 / 2.5 / 1.4 /
+  0.8% of CONUS cells respectively. For reference the historical baseline rate is
+  ~7.3 days/yr, so thresholds above that select cells where future extreme
+  fire-weather days are more frequent than they were historically.
 
 Line coverage is computed by sampling A along each line at 500 m spacing
 (reprojected to EPSG:5070 so equal spacing ⇒ equal length weight; 500 m is well
@@ -49,16 +49,18 @@ would not change the percentages).
 
 Outputs:
 - `<TAG>_national.png` — CONUS maps of undergrounding (A ≥ threshold) vs. not,
-  vertically stacked one per scenario, with state and Canada/Mexico country
-  boundaries and the transmission lines overlaid; titles report the % of CONUS
-  cells undergrounded.
-- `<TAG>_scenarios.png` — 3×3 grid (rows = threshold, cols = line).
+  vertically stacked one per threshold (8, 10, 15, 16, 18, 20 days/yr;
+  ascending), with state and Canada/Mexico country boundaries and the
+  transmission lines overlaid; titles report the % of CONUS cells undergrounded.
+- `<TAG>_scenarios.png` — grid (rows = threshold, cols = line).
 - `<TAG>_exceedance.png` — the lines coloured by A.
-- `<TAG>_summary.csv` — threshold + total/per-line coverage.
-- `<TAG>_points.gpkg` — densified sample points flagged by scenario (GIS).
+- `<TAG>_summary.csv` — each threshold + total/per-line coverage.
+- `<TAG>_points.gpkg` — densified sample points with a boolean `ug_<threshold>`
+  column per threshold (`ug_8`, `ug_10`, `ug_15`, `ug_16`, `ug_18`, `ug_20`)
+  flagging where A ≥ that threshold (GIS).
 
 ## Key knobs
 - Percentile driving undergrounding: `PCTILE` (98 by default; 95 available).
 - Metric for undergrounding: future rate **A** (not A − B).
-- Thresholds: `THRESHOLDS = {low 16, medium 18, high 20}` days/yr.
+- Thresholds: `THRESHOLDS = [8, 10, 15, 16, 18, 20]` days/yr.
 - Baseline / future split: historical 2000–2014 for thresholds, 2025–2059 for A.

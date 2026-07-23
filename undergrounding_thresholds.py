@@ -24,12 +24,13 @@ Inputs
 
 Outputs (to OUT_DIR)
 --------------------
-* <TAG>_scenarios.png    -- 3x3 grid: rows = low/med/high, cols = the 3 lines,
+* <TAG>_national.png     -- CONUS map per threshold (A >= threshold vs not).
+* <TAG>_scenarios.png    -- grid: rows = thresholds, cols = the 3 lines,
                             undergrounded segments in red.
 * <TAG>_exceedance.png   -- the 3 lines colored by A (context).
-* <TAG>_summary.csv      -- threshold value + coverage per scenario and line.
-* <TAG>_points.gpkg      -- densified sample points with A and per-scenario
-                            undergrounding flags (GIS).
+* <TAG>_summary.csv      -- threshold value + coverage per line.
+* <TAG>_points.gpkg      -- densified sample points with A and a ug_<threshold>
+                            flag column per threshold (GIS).
 
 Run inside the `reeds2` conda env (geopandas + scipy + matplotlib):
     conda activate reeds2
@@ -57,12 +58,9 @@ PCTILE = 98
 
 # Fixed exceedance-rate thresholds (days/yr above the historical p-th
 # percentile). A line/cell is undergrounded where A >= threshold. Lower
-# threshold -> more undergrounding. Chosen so the low scenario undergrounds
-# <= ~30% of the western US (lon < WEST_LON_MAX).
-THRESHOLDS = {"low": 16.0, "medium": 18.0, "high": 20.0}
-
-# Longitude cutoff defining the "western US" for coverage reporting.
-WEST_LON_MAX = -100.0
+# threshold -> more undergrounding. Each gets a ug_<threshold> flag column and a
+# national map panel; the historical baseline for reference is ~7.3 days/yr.
+THRESHOLDS = [8.0, 10.0, 15.0, 16.0, 18.0, 20.0]
 
 # CONUS state boundaries for the national maps.
 STATES_PATH = "/projects/rev/projects/scapes/maps/conus_state_boundaries.gpkg"
@@ -135,26 +133,25 @@ def main():
     valid = np.isfinite(samples["A"].to_numpy())
 
     # Fixed thresholds; a segment is undergrounded where A >= threshold.
-    scen_order = ["low", "medium", "high"]
-    thresholds = {s: float(THRESHOLDS[s]) for s in scen_order}
+    flag_thr = sorted(float(t) for t in THRESHOLDS)
 
-    # Flag undergrounding per scenario, and tabulate coverage.
+    def col(t):
+        return f"ug_{int(round(t))}"
+
+    # Flag undergrounding at each threshold, and tabulate coverage.
     rows = []
-    for s in scen_order:
-        thr = thresholds[s]
-        flag = samples["A"].to_numpy() >= thr
-        samples[f"ug_{s}"] = flag
-        samp_ll[f"ug_{s}"] = flag
+    for t in flag_thr:
+        flag = samples["A"].to_numpy() >= t
+        samples[col(t)] = flag
+        samp_ll[col(t)] = flag
         tot_cov = flag[valid].mean()
-        rows.append({"scenario": s, "threshold_days_per_yr": thr,
-                     "coverage_total": round(float(tot_cov), 3),
-                     "line": "ALL"})
+        rows.append({"threshold_days_per_yr": t, "line": "ALL",
+                     "coverage_total": round(float(tot_cov), 3)})
         for i, nm in enumerate(names):
             m = (samples["line"].to_numpy() == i) & valid
             cov = flag[m].mean() if m.any() else np.nan
-            rows.append({"scenario": s, "threshold_days_per_yr": thr,
-                         "coverage_total": round(float(cov), 3),
-                         "line": nm})
+            rows.append({"threshold_days_per_yr": t, "line": nm,
+                         "coverage_total": round(float(cov), 3)})
     summary = pd.DataFrame(rows)
     csv_path = os.path.join(OUT_DIR, f"{TAG}_summary.csv")
     summary.to_csv(csv_path, index=False)
@@ -167,12 +164,12 @@ def main():
     samp_ll.to_file(gpkg_path, driver="GPKG")
     print(f"Saved points  -> {gpkg_path}")
 
-    _plot(samples, samp_ll, lines_5070, names, thresholds, scen_order)
-    _plot_national(lat, lon, A, lines, thresholds, scen_order)
+    _plot(samples, samp_ll, lines_5070, names, flag_thr)
+    _plot_national(lat, lon, A, lines, flag_thr)
 
 
 # ----------------------------------------------------------------------------
-def _plot(samples, samp_ll, lines_5070, names, thresholds, scen_order):
+def _plot(samples, samp_ll, lines_5070, names, flag_thr):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -189,13 +186,13 @@ def _plot(samples, samp_ll, lines_5070, names, thresholds, scen_order):
         pady = max((b[3] - b[1]) * 0.08, 3000)
         return (b[0] - padx, b[2] + padx, b[1] - pady, b[3] + pady)
 
-    # ---- Figure 1: 3x3 scenario grid ----
-    fig, axes = plt.subplots(len(scen_order), n_line,
-                             figsize=(5 * n_line, 4.2 * len(scen_order)),
-                             constrained_layout=True)
-    for r, s in enumerate(scen_order):
-        thr = thresholds[s]
-        flag = samples[f"ug_{s}"].to_numpy()
+    # ---- Figure 1: threshold x line grid ----
+    n_thr = len(flag_thr)
+    fig, axes = plt.subplots(n_thr, n_line,
+                             figsize=(5 * n_line, 4.2 * n_thr),
+                             constrained_layout=True, squeeze=False)
+    for r, thr in enumerate(flag_thr):
+        flag = samples[f"ug_{int(round(thr))}"].to_numpy()
         for c in range(n_line):
             ax = axes[r, c]
             m = line_id == c
@@ -210,12 +207,11 @@ def _plot(samples, samp_ll, lines_5070, names, thresholds, scen_order):
             if r == 0:
                 ax.set_title(names[c], fontsize=10)
             if c == 0:
-                ax.set_ylabel(f"{s} threshold\n{thr:.0f} days/yr",
-                              fontsize=10)
+                ax.set_ylabel(f"A >= {thr:.0f} days/yr", fontsize=10)
             ax.text(0.5, 0.02, f"{cov*100:.0f}% undergrounded",
                     transform=ax.transAxes, ha="center", va="bottom",
                     fontsize=9, color="crimson")
-    fig.suptitle(f"Undergrounding scenarios from future exceedance rate "
+    fig.suptitle(f"Undergrounded line segments by threshold "
                  f"(A, days/yr > historical p{PCTILE})", fontsize=13)
     p1 = os.path.join(OUT_DIR, f"{TAG}_scenarios.png")
     fig.savefig(p1, dpi=150, bbox_inches="tight")
@@ -255,9 +251,9 @@ def _line_coords(geom):
         yield np.asarray(xs), np.asarray(ys)
 
 
-def _plot_national(lat, lon, A, lines_ll, thresholds, scen_order):
-    """CONUS maps of undergrounding (A >= threshold) vs not, one per scenario,
-    with the transmission lines overlaid."""
+def _plot_national(lat, lon, A, lines_ll, thr_list):
+    """CONUS maps of undergrounding (A >= threshold) vs not, one per threshold
+    (ascending), with state/country boundaries and the lines overlaid."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -273,14 +269,14 @@ def _plot_national(lat, lon, A, lines_ll, thresholds, scen_order):
     xlim = (-125.5, -66.5)
     ylim = (23.5, 51.0)
 
-    n = len(scen_order)
+    thr_list = sorted(thr_list)
+    n = len(thr_list)
     fig, axes = plt.subplots(n, 1, figsize=(8.5, 4.6 * n),
                              constrained_layout=True)
     if n == 1:
         axes = [axes]
-    for c, s in enumerate(scen_order):
+    for c, thr in enumerate(thr_list):
         ax = axes[c]
-        thr = thresholds[s]
         ug = A_f >= thr
         # Not-undergrounded (light grey) then undergrounded (crimson) on top.
         ax.scatter(lon_f[~ug], lat_f[~ug], c="0.85", s=0.3, marker="s",
@@ -294,7 +290,7 @@ def _plot_national(lat, lon, A, lines_ll, thresholds, scen_order):
             for xs, ys in _line_coords(geom):
                 ax.plot(xs, ys, color="black", lw=2.5, zorder=5)
         conus_pct = ug.mean() * 100
-        ax.set_title(f"{s} threshold: A >= {thr:.0f} days/yr  |  "
+        ax.set_title(f"A >= {thr:.0f} days/yr  |  "
                      f"{conus_pct:.1f}% of CONUS cells undergrounded",
                      fontsize=11)
         ax.set_xlim(*xlim); ax.set_ylim(*ylim)
